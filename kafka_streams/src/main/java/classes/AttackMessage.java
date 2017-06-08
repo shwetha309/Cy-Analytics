@@ -18,4 +18,5 @@ public class AttackMessage {
         public Object ddos_origin_port;
         public Object ddos_origin;
         public Object ddos_attack_bps;
+	public String timestamp;
 }
