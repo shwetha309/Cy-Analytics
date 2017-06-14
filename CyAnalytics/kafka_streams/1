@@ -1,0 +1,57 @@
+package hourly_count;
+
+import classes.*;
+import org.apache.kafka.streams.processor.AbstractProcessor;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.KeyValueIterator;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.*;
+import java.util.Objects;
+import java.text.SimpleDateFormat;
+import java.text.Format;
+import java.util.Date;
+import org.apache.kafka.streams.processor.*;
+
+public class HourlyAggregate extends AbstractProcessor<String, RegionSummary> {
+	private ProcessorContext context;
+	private KeyValueStore<String, String> hourlyStore;
+	
+	public void init(ProcessorContext context) {
+		this.context = context;
+		this.context.schedule(3000);
+		this.hourlyStore = (KeyValueStore<String, String>) context.getStateStore("HourlyCountStore");
+	}
+
+	public void process(String key, RegionSummary value) {
+		String count = hourlyStore.get(value.attack_type);
+		System.out.println(count);
+		if(count == null) {
+			
+			this.hourlyStore.put(value.attack_type, Integer.toString('1'));
+		}
+		else {
+			this.hourlyStore.put(value.attack_type, (Integer.valueOf(count)+1)+"");
+		}
+	}
+
+	public void punctuate(long timestamp) {
+		KeyValueIterator<String, String> iter = this.hourlyStore.all();
+
+		while(iter.hasNext()) {
+			KeyValue<String, String> entry = iter.next();
+			if( entry.value != null) {
+				
+				context.forward(entry.key, entry.value);
+			//System.out.println(Long.toString(timestamp),entry.value);
+				//System.out.println(entry.key+" "+entry.value);
+			}
+		}
+
+		iter.close();
+		context.commit();
+	}
+
+	public void close() {
+	}
+};
+
