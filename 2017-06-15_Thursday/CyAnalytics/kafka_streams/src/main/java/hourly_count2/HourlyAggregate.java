@@ -1,0 +1,67 @@
+package hourly_count2;
+
+import classes.*;
+import org.apache.kafka.streams.processor.AbstractProcessor;
+import org.apache.kafka.streams.processor.ProcessorContext;
+import org.apache.kafka.streams.state.KeyValueIterator;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.*;
+import java.util.Objects;
+import java.text.SimpleDateFormat;
+import java.text.Format;
+import java.util.Date;
+import java.math.BigInteger;
+import org.apache.kafka.streams.processor.*;
+
+public class HourlyAggregate extends AbstractProcessor<String, RegionSummary> {
+	private ProcessorContext context;
+	private KeyValueStore<String, String> hourlyStore;
+	
+	public void init(ProcessorContext context) {
+		this.context = context;
+		this.context.schedule(10);
+		this.hourlyStore = (KeyValueStore<String, String>) context.getStateStore("HourlyCountstore");
+	}
+
+	public void process(String key, RegionSummary value) {
+		if( value.attack_type != null || value.attack_type != "") {
+			String count = hourlyStore.get(value.attack_type);
+			System.out.println(Integer.parseInt(count.replace("\"","")));
+			System.out.println(value.attack_type);
+		
+			if(count == null) {
+			
+				this.hourlyStore.put(value.attack_type,1+"");
+			}
+			else {
+				count = count.replace("\"","");
+				BigInteger ct = new BigInteger(count);
+				ct = ct.add(BigInteger.ONE);
+				this.hourlyStore.put(value.attack_type, ct+"");
+			}
+		}
+	}
+
+	public void punctuate(long timestamp) {
+		KeyValueIterator<String, String> iter = this.hourlyStore.all();
+
+		while(iter.hasNext()) {
+			KeyValue<String, String> entry = iter.next();
+			if( entry.value != null) {
+				
+				context.forward(entry.key, entry.value);
+				this.hourlyStore.put(entry.key,"0");
+			//System.out.println(Long.toString(timestamp),entry.value);
+				//System.out.println(entry.key+" "+entry.value);
+			}
+		}
+
+		iter.close();
+		context.commit();
+	}
+
+	public void close() {
+	}
+};
+
+
